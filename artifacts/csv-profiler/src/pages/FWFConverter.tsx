@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import {
   Upload, FileText, FileSpreadsheet, CheckCircle2, AlertTriangle,
-  X, ArrowRight, Download, Eye, Layers, ChevronRight, RotateCcw,
+  X, ArrowRight, Download, Eye, Layers, RotateCcw,
   ShieldCheck, Key, Lock, Shuffle, LockOpen,
 } from "lucide-react";
 import {
@@ -20,13 +20,11 @@ type AnonMode = "encrypt" | "decrypt";
 export default function FWFConverter() {
   const [step, setStep] = useState<Step>("layout");
 
-  // ── Layout ──
   const [layoutSubStep, setLayoutSubStep] = useState<LayoutSubStep>("upload");
   const [layoutResult, setLayoutResult] = useState<ParseLayoutResult | null>(null);
   const [layoutFileName, setLayoutFileName] = useState("");
   const [layoutError, setLayoutError] = useState("");
 
-  // Sheet selection
   const [excelInfo, setExcelInfo] = useState<ExcelFileInfo | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [selectedSheet, setSelectedSheet] = useState("");
@@ -35,18 +33,15 @@ export default function FWFConverter() {
   const [sheetRowCount, setSheetRowCount] = useState(0);
   const [applyingSheet, setApplyingSheet] = useState(false);
 
-  // ── Data file ──
   const [dataFileName, setDataFileName] = useState("");
-  const [dataText, setDataText] = useState("");          // raw FWF text — source of truth
+  const [dataText, setDataText] = useState("");
   const [dataLineCount, setDataLineCount] = useState(0);
   const [dataError, setDataError] = useState("");
   const [preview, setPreview] = useState<string[][]>([]);
   const [outputBaseName, setOutputBaseName] = useState("");
 
-  // ── Convert step (instant — no data processing) ──
   const [converting, setConverting] = useState(false);
 
-  // ── Shared key settings ──
   const [anonMode, setAnonMode] = useState<AnonMode>("encrypt");
   const [anonKeyMode, setAnonKeyMode] = useState<"random" | "pbkdf2" | "hex">("random");
   const [anonSeed, setAnonSeed] = useState(42);
@@ -55,7 +50,6 @@ export default function FWFConverter() {
   const [anonDeterministic, setAnonDeterministic] = useState(true);
   const [anonKeyHexInput, setAnonKeyHexInput] = useState("");
 
-  // ── Encrypt ──
   const [encCols, setEncCols] = useState<Set<string>>(new Set());
   const [encRunning, setEncRunning] = useState(false);
   const [encProgress, setEncProgress] = useState(0);
@@ -64,11 +58,9 @@ export default function FWFConverter() {
   const [encError, setEncError] = useState("");
   const [keyCopied, setKeyCopied] = useState(false);
 
-  // Download original (async, shows progress)
   const [origDownloading, setOrigDownloading] = useState(false);
   const [origProgress, setOrigProgress] = useState(0);
 
-  // ── Decrypt ──
   const [decryptFileName, setDecryptFileName] = useState("");
   const [decryptCsvText, setDecryptCsvText] = useState<string | null>(null);
   const [decryptHeaders, setDecryptHeaders] = useState<string[]>([]);
@@ -85,8 +77,6 @@ export default function FWFConverter() {
   const fields: FieldDef[] = layoutResult?.fields ?? [];
   const allColNames = fields.map((f) => f.varName);
   const isConverted = step === "converted" || step === "anon-done";
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const triggerDownload = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -108,8 +98,6 @@ export default function FWFConverter() {
     anonKeyMode === "random" ? `seed = ${anonSeed}`
     : anonKeyMode === "pbkdf2" ? `PBKDF2 (${anonPbkdf2Iter.toLocaleString()} iter)`
     : "raw hex key";
-
-  // ── Layout ────────────────────────────────────────────────────────────────
 
   const handleLayoutFile = useCallback(async (file: File) => {
     setLayoutError(""); setLayoutResult(null); setLayoutFileName(file.name);
@@ -168,8 +156,6 @@ export default function FWFConverter() {
     finally { setApplyingSheet(false); }
   }, [pendingFile]);
 
-  // ── Data file ─────────────────────────────────────────────────────────────
-
   const handleDataFile = useCallback(async (file: File) => {
     setDataError(""); setDataFileName(file.name);
     setDataText(""); setDataLineCount(0); setPreview([]);
@@ -189,19 +175,14 @@ export default function FWFConverter() {
     setStep("data");
   }, [layoutResult]);
 
-  // ── Convert (instant — just transitions the step) ────────────────────────
-
   const handleConvert = useCallback(async () => {
     if (!layoutResult || !dataText) return;
     setConverting(true);
-    // Small async yield so spinner renders before we update state
     await new Promise((r) => setTimeout(r, 30));
     setEncCols(new Set(layoutResult.fields.map((f) => f.varName)));
     setStep("converted");
     setConverting(false);
   }, [layoutResult, dataText]);
-
-  // ── Encrypt ───────────────────────────────────────────────────────────────
 
   const handleEncrypt = useCallback(async () => {
     if (!layoutResult || !dataText) return;
@@ -250,8 +231,6 @@ export default function FWFConverter() {
     triggerDownload(new Blob([txt], { type: "text/plain" }), `aes256_key_${outputBaseName || "export"}.txt`);
   };
 
-  // ── Decrypt ───────────────────────────────────────────────────────────────
-
   const handleDecryptFile = useCallback(async (file: File) => {
     setDecryptError(""); setDecryptBlob(null); setDecryptFileName(file.name);
     setDecryptCsvText(null); setDecryptHeaders([]);
@@ -292,14 +271,12 @@ export default function FWFConverter() {
     setDecryptCols(new Set()); setDecryptBlob(null); setDecryptError("");
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Step indicator */}
-      <div className="flex items-center gap-2 text-sm flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         {(["Upload layout", "Upload data file", "Convert", "Anonymize & download"] as const).map((label, idx) => {
           const n = idx + 1;
-          const stepKey = ["layout", "data", "data", "converted"] as const;
           const done =
             n === 1 ? step !== "layout" :
             n === 2 ? isConverted :
@@ -311,30 +288,30 @@ export default function FWFConverter() {
             n === 3 ? step === "data" && !isConverted :
             step === "converted";
           return (
-            <span key={n} className="flex items-center gap-2">
-              {idx > 0 && <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+            <span key={n} className="flex items-center gap-3">
+              {idx > 0 && <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" />}
               <StepBadge n={n} label={label} active={active} done={done} />
             </span>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr] min-w-0">
-        {/* ── Step 1: Layout ───────────────────────────────────────────────── */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4 min-w-0 overflow-hidden">
-          <div className="flex items-center justify-between">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_1fr] min-w-0">
+        {/* ── Step 1: Layout ─────────────────────────────────────────────── */}
+        <div className="border border-gray-200 rounded-2xl p-6 space-y-5 min-w-0 overflow-hidden">
+          <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Step 1 — Layout file</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Excel (.xlsx) or CSV with Field_Name, Start, End columns</p>
+              <h2 className="text-lg font-semibold text-black">Step 1 — Layout file</h2>
+              <p className="text-sm text-gray-500 mt-1">Excel (.xlsx) or CSV with Field_Name, Start, End columns</p>
             </div>
             {(layoutResult || layoutSubStep === "sheet-select") && (
-              <button onClick={handleReset} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+              <button onClick={handleReset} className="text-gray-400 hover:text-black mt-1"><X className="w-5 h-5" /></button>
             )}
           </div>
 
           {layoutSubStep === "upload" && (
             <>
-              <DropZone accept=".xlsx,.xls,.csv" icon={<FileSpreadsheet className="w-8 h-8 text-primary" />}
+              <DropZone accept=".xlsx,.xls,.csv" icon={<FileSpreadsheet className="w-9 h-9 text-blue-600" />}
                 label="Drop layout file here" sublabel="Excel or CSV"
                 inputRef={layoutInputRef} onFile={handleLayoutFile} />
               {layoutError && <ErrorBox message={layoutError} />}
@@ -342,14 +319,14 @@ export default function FWFConverter() {
           )}
 
           {layoutSubStep === "sheet-select" && excelInfo && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <InfoBadge icon={<FileSpreadsheet className="w-4 h-4" />} text={`${layoutFileName} — ${excelInfo.sheetNames.length} sheets`} />
               <div className="space-y-2">
-                <label className="text-xs font-semibold flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" />Select sheet</label>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                <label className="text-sm font-semibold text-black flex items-center gap-2"><Layers className="w-4 h-4" />Select sheet</label>
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                   {excelInfo.sheetNames.map((name) => (
-                    <label key={name} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer text-xs transition-colors ${selectedSheet === name ? "border-primary bg-primary/5 text-foreground" : "border-border hover:border-primary/30 text-muted-foreground"}`}>
-                      <input type="radio" name="sheet" value={name} checked={selectedSheet === name} onChange={() => handleSheetChange(name)} className="accent-primary" />
+                    <label key={name} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border cursor-pointer text-sm transition-colors ${selectedSheet === name ? "border-blue-500 bg-blue-50 text-black" : "border-gray-200 hover:border-blue-300 text-gray-500"}`}>
+                      <input type="radio" name="sheet" value={name} checked={selectedSheet === name} onChange={() => handleSheetChange(name)} className="accent-blue-600" />
                       <span className="font-medium">{name}</span>
                     </label>
                   ))}
@@ -357,15 +334,15 @@ export default function FWFConverter() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold">Row range {sheetRowCount > 0 && <span className="font-normal text-muted-foreground">({sheetRowCount} rows)</span>}</label>
-                  {(rowFrom || rowTo) && <button onClick={() => { setRowFrom(""); setRowTo(""); }} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"><RotateCcw className="w-3 h-3" />All rows</button>}
+                  <label className="text-sm font-semibold text-black">Row range {sheetRowCount > 0 && <span className="font-normal text-gray-500">({sheetRowCount} rows)</span>}</label>
+                  {(rowFrom || rowTo) && <button onClick={() => { setRowFrom(""); setRowTo(""); }} className="text-sm text-gray-400 hover:text-black flex items-center gap-1"><RotateCcw className="w-3.5 h-3.5" />All rows</button>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {[{ label: "From", val: rowFrom, set: setRowFrom, ph: "1" }, { label: "To", val: rowTo, set: setRowTo, ph: sheetRowCount ? String(sheetRowCount) : "last" }].map(({ label, val, set, ph }, i) => (
                     <div key={i} className="flex-1 space-y-1">
-                      <p className="text-[11px] text-muted-foreground">{label} row</p>
+                      <p className="text-sm text-gray-500">{label} row</p>
                       <input type="number" min={1} placeholder={ph} value={val} onChange={(e) => set(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
                     </div>
                   ))}
                 </div>
@@ -373,37 +350,37 @@ export default function FWFConverter() {
               {layoutError && <ErrorBox message={layoutError} />}
               <div className="flex flex-col gap-2">
                 <button onClick={handleConfirmSheet} disabled={applyingSheet || !selectedSheet}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black text-white text-base font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
                   {applyingSheet ? <><Spin />Parsing…</> : <><ArrowRight className="w-4 h-4" />Use selected sheet</>}
                 </button>
                 <button onClick={handleAutoDetect} disabled={applyingSheet}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground disabled:opacity-60">
-                  <Upload className="w-3.5 h-3.5" />Auto-detect layout sheet
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:text-black hover:border-gray-400 disabled:opacity-50 transition-colors">
+                  <Upload className="w-4 h-4" />Auto-detect layout sheet
                 </button>
               </div>
             </div>
           )}
 
           {layoutSubStep === "done" && layoutResult && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <SuccessBadge text={`${layoutFileName} — ${fields.length} fields${layoutResult.sheetName ? ` (${layoutResult.sheetName})` : ""}`} />
               {layoutResult.warnings.length > 0 && <WarnBox message={layoutResult.warnings.join(" ")} />}
-              <div className="overflow-auto max-h-72 rounded-lg border border-border">
-                <table className="w-full text-xs border-collapse">
-                  <thead className="bg-muted sticky top-0">
+              <div className="overflow-auto max-h-72 rounded-xl border border-gray-200">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="bg-gray-50 sticky top-0">
                     <tr>{["#", "Variable", "Full Name", "Start", "End", "Len"].map((h) => (
-                      <th key={h} className="px-2 py-1.5 text-left border-r last:border-r-0 border-border/50 text-muted-foreground font-medium">{h}</th>
+                      <th key={h} className="px-3 py-2.5 text-left border-r last:border-r-0 border-gray-200 text-gray-500 font-semibold">{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody>
                     {fields.map((f) => (
-                      <tr key={f.srlNo} className="border-t border-border/40 hover:bg-muted/30">
-                        <td className="px-2 py-1 text-muted-foreground font-mono border-r border-border/30">{f.srlNo}</td>
-                        <td className="px-2 py-1 font-medium border-r border-border/30 whitespace-nowrap">{f.varName}</td>
-                        <td className="px-2 py-1 text-muted-foreground border-r border-border/30">{f.fullName}</td>
-                        <td className="px-2 py-1 text-center font-mono border-r border-border/30">{f.start}</td>
-                        <td className="px-2 py-1 text-center font-mono border-r border-border/30">{f.end}</td>
-                        <td className="px-2 py-1 text-center font-mono">{f.length}</td>
+                      <tr key={f.srlNo} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="px-3 py-2 text-gray-400 font-mono border-r border-gray-100">{f.srlNo}</td>
+                        <td className="px-3 py-2 font-semibold text-black border-r border-gray-100 whitespace-nowrap">{f.varName}</td>
+                        <td className="px-3 py-2 text-gray-600 border-r border-gray-100">{f.fullName}</td>
+                        <td className="px-3 py-2 text-center font-mono text-black border-r border-gray-100">{f.start}</td>
+                        <td className="px-3 py-2 text-center font-mono text-black border-r border-gray-100">{f.end}</td>
+                        <td className="px-3 py-2 text-center font-mono text-black">{f.length}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -413,45 +390,45 @@ export default function FWFConverter() {
           )}
         </div>
 
-        {/* ── Step 2 + 3: Data & Convert ───────────────────────────────────── */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4 min-w-0 overflow-hidden">
+        {/* ── Step 2 + 3: Data & Convert ─────────────────────────────────── */}
+        <div className="border border-gray-200 rounded-2xl p-6 space-y-5 min-w-0 overflow-hidden">
           <div>
-            <h2 className="text-sm font-semibold">Step 2 — Fixed-width data file</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">The .TXT file containing the actual records</p>
+            <h2 className="text-lg font-semibold text-black">Step 2 — Fixed-width data file</h2>
+            <p className="text-sm text-gray-500 mt-1">The .TXT file containing the actual records</p>
           </div>
 
           {!layoutResult ? (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground border-2 border-dashed border-border/40 rounded-xl">
+            <div className="flex items-center justify-center h-44 text-base text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
               Complete Step 1 first
             </div>
           ) : !dataFileName ? (
-            <DropZone accept=".txt,.dat,.fwf,.data" icon={<FileText className="w-8 h-8 text-primary" />}
+            <DropZone accept=".txt,.dat,.fwf,.data" icon={<FileText className="w-9 h-9 text-blue-600" />}
               label="Drop fixed-width data file here" sublabel=".TXT, .DAT or any fixed-width file"
               inputRef={dataInputRef} onFile={handleDataFile} />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-center gap-2">
                 <SuccessBadge text={`${dataFileName} — ${dataLineCount.toLocaleString()} records`} />
                 {!isConverted && (
                   <button onClick={() => { setDataFileName(""); setDataText(""); setDataLineCount(0); setPreview([]); setStep("data"); }}
-                    className="ml-auto text-muted-foreground hover:text-foreground flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    className="ml-auto text-gray-400 hover:text-black flex-shrink-0"><X className="w-4 h-4" /></button>
                 )}
               </div>
 
               {preview.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Eye className="w-3.5 h-3.5" />Preview (first {preview.length} rows)</p>
-                  <div className="overflow-auto max-h-48 rounded-lg border border-border text-[11px]">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5"><Eye className="w-4 h-4" />Preview (first {preview.length} rows)</p>
+                  <div className="overflow-auto max-h-48 rounded-xl border border-gray-200 text-xs">
                     <table className="w-full border-collapse">
-                      <thead className="bg-muted sticky top-0">
-                        <tr>{fields.map((f) => <th key={f.srlNo} className="px-2 py-1 text-left font-medium text-muted-foreground border-r border-border/50 whitespace-nowrap">{f.varName}</th>)}</tr>
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>{fields.map((f) => <th key={f.srlNo} className="px-3 py-2 text-left font-semibold text-gray-500 border-r border-gray-200 whitespace-nowrap">{f.varName}</th>)}</tr>
                       </thead>
                       <tbody>
                         {preview.map((row, ri) => (
-                          <tr key={ri} className="border-t border-border/40">
+                          <tr key={ri} className="border-t border-gray-100">
                             {row.map((cell, ci) => (
-                              <td key={ci} className="px-2 py-1 font-mono border-r border-border/30 whitespace-nowrap">
-                                {cell || <span className="text-muted-foreground/40 italic">—</span>}
+                              <td key={ci} className="px-3 py-1.5 font-mono border-r border-gray-100 whitespace-nowrap text-black">
+                                {cell || <span className="text-gray-300 italic">—</span>}
                               </td>
                             ))}
                           </tr>
@@ -466,7 +443,7 @@ export default function FWFConverter() {
 
               {!isConverted ? (
                 <button onClick={handleConvert} disabled={converting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black text-white text-base font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
                   {converting ? <><Spin />Preparing…</> : <><ArrowRight className="w-4 h-4" />Convert {dataLineCount.toLocaleString()} records → proceed to anonymize</>}
                 </button>
               ) : (
@@ -477,30 +454,28 @@ export default function FWFConverter() {
         </div>
       </div>
 
-      {/* ── Step 4: Anonymize ─────────────────────────────────────────────────── */}
+      {/* ── Step 4: Anonymize ─────────────────────────────────────────────── */}
       {isConverted && layoutResult && (
-        <div className="bg-card border border-border rounded-xl p-5 space-y-5 min-w-0 overflow-hidden">
-          {/* Header + mode toggle */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0" />
+        <div className="border border-gray-200 rounded-2xl p-6 space-y-6 min-w-0 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <ShieldCheck className="w-6 h-6 text-blue-600 flex-shrink-0" />
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold">Step 4 — AES-256-GCM Encrypt / Decrypt</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Format-preserving: digits→digits, letters→letters</p>
+                <h2 className="text-lg font-semibold text-black">Step 4 — AES-256-GCM Encrypt / Decrypt</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Format-preserving: digits→digits, letters→letters</p>
               </div>
             </div>
-            <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs font-medium flex-shrink-0">
+            <div className="flex items-center rounded-xl border border-gray-200 overflow-hidden text-sm font-semibold flex-shrink-0">
               {(["encrypt", "decrypt"] as const).map((m) => (
                 <button key={m} onClick={() => { setAnonMode(m); setEncError(""); setDecryptError(""); }}
-                  className={`flex items-center gap-1.5 px-3 py-2 transition-colors ${m !== "encrypt" ? "border-l border-border" : ""} ${anonMode === m ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}>
-                  {m === "encrypt" ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+                  className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${m !== "encrypt" ? "border-l border-gray-200" : ""} ${anonMode === m ? "bg-black text-white" : "hover:bg-gray-50 text-gray-500"}`}>
+                  {m === "encrypt" ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
                   {m === "encrypt" ? "Encrypt" : "Decrypt"}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Shared key settings */}
           <KeySettings
             keyMode={anonKeyMode} setKeyMode={setAnonKeyMode}
             seed={anonSeed} setSeed={setAnonSeed}
@@ -510,64 +485,63 @@ export default function FWFConverter() {
             keyHexInput={anonKeyHexInput} setKeyHexInput={setAnonKeyHexInput}
           />
 
-          {/* ─ ENCRYPT ─ */}
+          {/* ENCRYPT */}
           {anonMode === "encrypt" && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <ColSelector allCols={allColNames} selected={encCols} onChange={setEncCols} label="Columns to encrypt" />
 
               {encError && <ErrorBox message={encError} />}
-              {encRunning && <ProgressBar pct={encProgress} label={`Encrypting ${encCols.size} column${encCols.size !== 1 ? "s" : ""} across ${dataLineCount.toLocaleString()} records…`} icon={<Shuffle className="w-3.5 h-3.5 animate-spin" />} />}
-              {origDownloading && <ProgressBar pct={origProgress} label="Building original CSV…" icon={<Download className="w-3.5 h-3.5 animate-pulse" />} />}
+              {encRunning && <ProgressBar pct={encProgress} label={`Encrypting ${encCols.size} column${encCols.size !== 1 ? "s" : ""} across ${dataLineCount.toLocaleString()} records…`} icon={<Shuffle className="w-4 h-4 animate-spin" />} />}
+              {origDownloading && <ProgressBar pct={origProgress} label="Building original CSV…" icon={<Download className="w-4 h-4 animate-pulse" />} />}
 
               {step !== "anon-done" && (
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button onClick={handleEncrypt} disabled={encRunning || origDownloading || encCols.size === 0}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black text-white text-base font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
                     {encRunning ? <><Spin />Encrypting…</> : <><Lock className="w-4 h-4" />Apply AES-256-GCM encryption</>}
                   </button>
                   <button onClick={handleDownloadOriginal} disabled={encRunning || origDownloading}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-60">
-                    {origDownloading ? <><Spin />Building…</> : <><Download className="w-3.5 h-3.5" />Skip — download original</>}
+                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-500 hover:text-black hover:border-gray-400 disabled:opacity-50 transition-colors">
+                    {origDownloading ? <><Spin />Building…</> : <><Download className="w-4 h-4" />Skip — download original</>}
                   </button>
                 </div>
               )}
 
               {step === "anon-done" && encResultBlob && encResultKey && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <SuccessBadge text={`Encryption complete — ${encCols.size} column${encCols.size !== 1 ? "s" : ""} encrypted across ${dataLineCount.toLocaleString()} records`} />
 
-                  {/* Key material */}
-                  <div className="border border-amber-300 bg-amber-50 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5"><Key className="w-4 h-4" />Symmetric Key — save this to decrypt later</p>
-                    <div className="font-mono text-[11px] bg-white border border-amber-200 rounded-lg px-3 py-2.5 break-all select-all cursor-text leading-relaxed">
+                  <div className="border-l-4 border-amber-400 bg-amber-50 rounded-r-xl p-5 space-y-3">
+                    <p className="text-sm font-semibold text-amber-800 flex items-center gap-2"><Key className="w-4 h-4" />Symmetric Key — save this to decrypt later</p>
+                    <div className="font-mono text-xs bg-white rounded-lg px-4 py-3 break-all select-all cursor-text leading-relaxed text-black border border-amber-200">
                       {encResultKey}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-amber-700 flex-1 min-w-0">AES-256 · {keyModeLabel} · det. {anonDeterministic ? "ON" : "OFF"}</span>
-                      <button onClick={() => handleCopyKey(encResultKey)} className="text-[11px] px-2.5 py-1 rounded border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap">
+                      <span className="text-sm text-amber-700 flex-1 min-w-0">AES-256 · {keyModeLabel} · det. {anonDeterministic ? "ON" : "OFF"}</span>
+                      <button onClick={() => handleCopyKey(encResultKey)} className="text-sm px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap font-medium">
                         {keyCopied ? "✓ Copied!" : "Copy key"}
                       </button>
-                      <button onClick={() => handleDownloadKey(encResultKey)} className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap">
-                        <Download className="w-3 h-3" />Download key (.txt)
+                      <button onClick={() => handleDownloadKey(encResultKey)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap font-medium">
+                        <Download className="w-3.5 h-3.5" />Download key (.txt)
                       </button>
                     </div>
-                    <p className="text-[11px] text-amber-700/80">⚠ Same key decrypts. Store in a secure vault — never log or share.</p>
+                    <p className="text-sm text-amber-700">⚠ Same key decrypts. Store in a secure vault — never log or share.</p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button onClick={() => triggerDownload(encResultBlob!, `${outputBaseName}_anonymized.csv`)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-base font-semibold hover:bg-emerald-700 transition-colors">
                       <Download className="w-4 h-4" />Download anonymized CSV
                     </button>
                     <button onClick={handleDownloadOriginal} disabled={origDownloading}
-                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-60 transition-colors">
-                      {origDownloading ? <><Spin />Building…</> : <><Download className="w-3.5 h-3.5" />Download original CSV</>}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-500 hover:text-black hover:border-gray-400 disabled:opacity-50 transition-colors">
+                      {origDownloading ? <><Spin />Building…</> : <><Download className="w-4 h-4" />Download original CSV</>}
                     </button>
                   </div>
-                  {origDownloading && <ProgressBar pct={origProgress} label="Building original CSV…" icon={<Download className="w-3.5 h-3.5 animate-pulse" />} />}
+                  {origDownloading && <ProgressBar pct={origProgress} label="Building original CSV…" icon={<Download className="w-4 h-4 animate-pulse" />} />}
 
                   <button onClick={() => { setEncResultBlob(null); setEncResultKey(null); setEncProgress(0); setStep("converted"); }}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground text-center">
+                    className="w-full text-sm text-gray-400 hover:text-black text-center transition-colors">
                     ← Change column selection or key settings
                   </button>
                 </div>
@@ -575,23 +549,23 @@ export default function FWFConverter() {
             </div>
           )}
 
-          {/* ─ DECRYPT ─ */}
+          {/* DECRYPT */}
           {anonMode === "decrypt" && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="space-y-2">
-                <p className="text-xs font-semibold">Upload anonymized CSV to decrypt</p>
-                <p className="text-[11px] text-muted-foreground">Must have been encrypted by this tool with matching key settings.</p>
+                <p className="text-base font-semibold text-black">Upload anonymized CSV to decrypt</p>
+                <p className="text-sm text-gray-500">Must have been encrypted by this tool with matching key settings.</p>
 
                 {!decryptCsvText ? (
-                  <DropZone accept=".csv" icon={<LockOpen className="w-8 h-8 text-primary" />}
+                  <DropZone accept=".csv" icon={<LockOpen className="w-9 h-9 text-blue-600" />}
                     label="Drop anonymized CSV here" sublabel=".CSV encrypted by this tool"
                     inputRef={decryptInputRef} onFile={handleDecryptFile} />
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <SuccessBadge text={`${decryptFileName} — ${decryptHeaders.length} columns detected`} />
                       <button onClick={() => { setDecryptFileName(""); setDecryptCsvText(null); setDecryptHeaders([]); setDecryptCols(new Set()); setDecryptBlob(null); }}
-                        className="ml-auto text-muted-foreground hover:text-foreground flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+                        className="ml-auto text-gray-400 hover:text-black flex-shrink-0"><X className="w-4 h-4" /></button>
                     </div>
                     <ColSelector allCols={decryptHeaders} selected={decryptCols} onChange={setDecryptCols} label="Columns to decrypt" />
                   </div>
@@ -599,23 +573,23 @@ export default function FWFConverter() {
               </div>
 
               {decryptError && <ErrorBox message={decryptError} />}
-              {decryptRunning && <ProgressBar pct={decryptProgress} label={`Decrypting ${decryptCols.size} column${decryptCols.size !== 1 ? "s" : ""}…`} icon={<Shuffle className="w-3.5 h-3.5 animate-spin" />} />}
+              {decryptRunning && <ProgressBar pct={decryptProgress} label={`Decrypting ${decryptCols.size} column${decryptCols.size !== 1 ? "s" : ""}…`} icon={<Shuffle className="w-4 h-4 animate-spin" />} />}
 
               {!decryptBlob ? (
                 <button onClick={handleDecrypt} disabled={decryptRunning || !decryptCsvText || decryptCols.size === 0}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black text-white text-base font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
                   {decryptRunning ? <><Spin />Decrypting…</> : <><LockOpen className="w-4 h-4" />Apply AES-256-GCM decryption</>}
                 </button>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <SuccessBadge text="Decryption complete — original values restored" />
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button onClick={() => triggerDownload(decryptBlob!, `${decryptFileName.replace(/\.csv$/i, "")}_decrypted.csv`)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-base font-semibold hover:bg-emerald-700 transition-colors">
                       <Download className="w-4 h-4" />Download decrypted CSV
                     </button>
                     <button onClick={() => { setDecryptBlob(null); setDecryptProgress(0); }}
-                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-500 hover:text-black hover:border-gray-400 transition-colors">
                       ← Change settings
                     </button>
                   </div>
@@ -629,7 +603,7 @@ export default function FWFConverter() {
   );
 }
 
-// ── Key Settings component ────────────────────────────────────────────────────
+// ── Key Settings ──────────────────────────────────────────────────────────────
 
 function KeySettings({ keyMode, setKeyMode, seed, setSeed, passphrase, setPassphrase, pbkdf2Iter, setPbkdf2Iter, deterministic, setDeterministic, keyHexInput, setKeyHexInput }: {
   keyMode: "random" | "pbkdf2" | "hex"; setKeyMode: (m: "random" | "pbkdf2" | "hex") => void;
@@ -640,43 +614,43 @@ function KeySettings({ keyMode, setKeyMode, seed, setSeed, passphrase, setPassph
   keyHexInput: string; setKeyHexInput: (s: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-muted/30 border border-border/60 rounded-xl p-4">
-      <div className="space-y-2">
-        <p className="text-xs font-semibold flex items-center gap-1.5"><Key className="w-3.5 h-3.5" />Key derivation</p>
-        <div className="space-y-1.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 border-t border-gray-100">
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-black flex items-center gap-2"><Key className="w-4 h-4" />Key derivation</p>
+        <div className="space-y-2">
           {(["random", "pbkdf2", "hex"] as const).map((m) => (
-            <label key={m} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-xs transition-colors ${keyMode === m ? "border-primary bg-primary/5 text-foreground" : "border-border hover:border-primary/30 text-muted-foreground"}`}>
-              <input type="radio" name="keymode" checked={keyMode === m} onChange={() => setKeyMode(m)} className="accent-primary" />
+            <label key={m} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border cursor-pointer text-sm transition-colors ${keyMode === m ? "border-blue-500 bg-blue-50 text-black" : "border-gray-200 hover:border-blue-300 text-gray-500"}`}>
+              <input type="radio" name="keymode" checked={keyMode === m} onChange={() => setKeyMode(m)} className="accent-blue-600" />
               {m === "random" ? "Random (seed)" : m === "pbkdf2" ? "PBKDF2 passphrase" : "Paste hex key"}
             </label>
           ))}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold">{keyMode === "random" ? "Key seed" : keyMode === "pbkdf2" ? "Passphrase" : "256-bit hex key"}</p>
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-black">{keyMode === "random" ? "Key seed" : keyMode === "pbkdf2" ? "Passphrase" : "256-bit hex key"}</p>
         {keyMode === "random" && (
           <>
             <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))}
-              className="w-full px-2 py-1.5 text-xs font-mono rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
-            <p className="text-[11px] text-muted-foreground">Same seed → same key (reproducible)</p>
+              className="w-full px-3 py-2.5 text-sm font-mono rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
+            <p className="text-sm text-gray-500">Same seed → same key (reproducible)</p>
           </>
         )}
         {keyMode === "pbkdf2" && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="Enter passphrase…"
-              className="w-full px-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
             <div>
-              <p className="text-[11px] text-muted-foreground mb-1">Iterations: {pbkdf2Iter.toLocaleString()}</p>
-              <input type="range" min={10000} max={500000} step={10000} value={pbkdf2Iter} onChange={(e) => setPbkdf2Iter(Number(e.target.value))} className="w-full accent-primary" />
+              <p className="text-sm text-gray-500 mb-1">Iterations: {pbkdf2Iter.toLocaleString()}</p>
+              <input type="range" min={10000} max={500000} step={10000} value={pbkdf2Iter} onChange={(e) => setPbkdf2Iter(Number(e.target.value))} className="w-full accent-blue-600" />
             </div>
           </div>
         )}
         {keyMode === "hex" && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             <textarea value={keyHexInput} onChange={(e) => setKeyHexInput(e.target.value)} placeholder="Paste 64-char hex key…" rows={2}
-              className={`w-full px-2 py-1.5 text-xs font-mono rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-primary resize-none ${keyHexInput && keyHexInput.trim().length !== 64 ? "border-destructive" : "border-border"}`} />
-            <p className={`text-[11px] ${keyHexInput.trim().length === 64 ? "text-emerald-600" : "text-muted-foreground"}`}>
+              className={`w-full px-3 py-2.5 text-xs font-mono rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-black ${keyHexInput && keyHexInput.trim().length !== 64 ? "border-red-400" : "border-gray-200"}`} />
+            <p className={`text-sm ${keyHexInput.trim().length === 64 ? "text-emerald-600" : "text-gray-500"}`}>
               {keyHexInput.trim().length === 64 ? "✓ Valid 256-bit key" : `${keyHexInput.trim().length}/64 hex chars`}
             </p>
           </div>
@@ -684,16 +658,16 @@ function KeySettings({ keyMode, setKeyMode, seed, setSeed, passphrase, setPassph
       </div>
 
       <div className="space-y-3">
-        <label className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer text-xs transition-colors ${deterministic ? "border-primary bg-primary/5 text-foreground" : "border-border hover:border-primary/30 text-muted-foreground"}`}>
-          <input type="checkbox" checked={deterministic} onChange={(e) => setDeterministic(e.target.checked)} className="accent-primary w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+        <label className={`flex items-start gap-3 px-4 py-3 rounded-xl border cursor-pointer text-sm transition-colors ${deterministic ? "border-blue-500 bg-blue-50 text-black" : "border-gray-200 hover:border-blue-300 text-gray-500"}`}>
+          <input type="checkbox" checked={deterministic} onChange={(e) => setDeterministic(e.target.checked)} className="accent-blue-600 w-4 h-4 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-medium">Deterministic mode</p>
-            <p className="text-[10px] mt-0.5 opacity-75">Same value → same output. Required for consistent round-trip.</p>
+            <p className="font-semibold">Deterministic mode</p>
+            <p className="text-xs mt-1 opacity-70">Same value → same output. Required for consistent round-trip.</p>
           </div>
         </label>
-        <div className="bg-background border border-border/50 rounded-lg p-2.5 space-y-1 text-[10px] text-muted-foreground">
+        <div className="space-y-1 text-sm text-gray-500">
           {[["Cipher", "AES-256-GCM"], ["Key", "256-bit"], ["IV", "96-bit"], ["Tag", "128-bit GHASH"], ["Std", "NIST FIPS 197"]].map(([k, v]) => (
-            <div key={k} className="flex gap-1.5"><span className="font-medium text-foreground w-8 shrink-0">{k}</span><span>{v}</span></div>
+            <div key={k} className="flex gap-3"><span className="font-semibold text-black w-10 shrink-0">{k}</span><span>{v}</span></div>
           ))}
         </div>
       </div>
@@ -705,19 +679,19 @@ function KeySettings({ keyMode, setKeyMode, seed, setSeed, passphrase, setPassph
 
 function ColSelector({ allCols, selected, onChange, label }: { allCols: string[]; selected: Set<string>; onChange: (s: Set<string>) => void; label: string }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold">{label} <span className="font-normal text-muted-foreground">({selected.size}/{allCols.length})</span></span>
+        <span className="text-sm font-semibold text-black">{label} <span className="font-normal text-gray-500">({selected.size}/{allCols.length})</span></span>
         <div className="flex gap-2">
-          <button onClick={() => onChange(new Set(allCols))} className="text-[11px] px-2 py-1 rounded border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground">Select all</button>
-          <button onClick={() => onChange(new Set())} className="text-[11px] px-2 py-1 rounded border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground">Clear</button>
+          <button onClick={() => onChange(new Set(allCols))} className="text-sm px-3 py-1 rounded-lg border border-gray-200 hover:border-gray-400 text-gray-500 hover:text-black transition-colors">Select all</button>
+          <button onClick={() => onChange(new Set())} className="text-sm px-3 py-1 rounded-lg border border-gray-200 hover:border-gray-400 text-gray-500 hover:text-black transition-colors">Clear</button>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-1.5 max-h-52 overflow-y-auto pr-1 border border-border/50 rounded-lg p-2 bg-muted/20">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 max-h-52 overflow-y-auto pr-1 pt-1">
         {allCols.map((col) => (
-          <label key={col} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-pointer text-[11px] transition-colors ${selected.has(col) ? "border-primary/40 bg-primary/5 text-foreground" : "border-transparent hover:border-border text-muted-foreground hover:text-foreground"}`}>
-            <input type="checkbox" checked={selected.has(col)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(col); else n.delete(col); onChange(n); }} className="accent-primary w-3 h-3 flex-shrink-0" />
-            <span className="truncate font-mono">{col}</span>
+          <label key={col} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm transition-colors ${selected.has(col) ? "border-blue-500 bg-blue-50 text-black" : "border-gray-200 hover:border-blue-300 text-gray-500 hover:text-black"}`}>
+            <input type="checkbox" checked={selected.has(col)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(col); else n.delete(col); onChange(n); }} className="accent-blue-600 w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate font-mono text-xs">{col}</span>
           </label>
         ))}
       </div>
@@ -729,13 +703,13 @@ function ColSelector({ allCols, selected, onChange, label }: { allCols: string[]
 
 function ProgressBar({ pct, label, icon }: { pct: number; label: string; icon?: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5 min-w-0 truncate">{icon}{label}</span>
-        <span className="flex-shrink-0 ml-2">{pct}%</span>
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm text-gray-500">
+        <span className="flex items-center gap-2 min-w-0 truncate">{icon}{label}</span>
+        <span className="flex-shrink-0 ml-2 font-semibold text-black">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div className="h-full bg-primary rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full bg-black rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -743,9 +717,9 @@ function ProgressBar({ pct, label, icon }: { pct: number; label: string; icon?: 
 
 function StepBadge({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
   return (
-    <div className={`flex items-center gap-1.5 text-xs font-medium ${active ? "text-primary" : done ? "text-emerald-600" : "text-muted-foreground"}`}>
-      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${active ? "bg-primary text-primary-foreground" : done ? "bg-emerald-100 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
-        {done ? <CheckCircle2 className="w-3 h-3" /> : n}
+    <div className={`flex items-center gap-2 text-sm font-semibold ${active ? "text-black" : done ? "text-emerald-600" : "text-gray-400"}`}>
+      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${active ? "bg-black text-white" : done ? "bg-emerald-100 text-emerald-600" : "bg-gray-100 text-gray-400"}`}>
+        {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : n}
       </span>
       {label}
     </div>
@@ -755,16 +729,19 @@ function StepBadge({ n, label, active, done }: { n: number; label: string; activ
 function DropZone({ accept, icon, label, sublabel, inputRef, onFile }: { accept: string; icon: React.ReactNode; label: string; sublabel: string; inputRef: React.RefObject<HTMLInputElement | null>; onFile: (f: File) => void }) {
   const [dragging, setDragging] = useState(false);
   return (
-    <div className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/20"}`}
+    <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragging ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-400 hover:bg-gray-50"}`}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}
       onClick={() => inputRef.current?.click()}>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">{icon}</div>
-        <div><p className="text-sm font-medium">{label}</p><p className="text-xs text-muted-foreground mt-1">{sublabel}</p></div>
-        <span className="text-xs px-3 py-1.5 rounded-lg border border-border bg-background text-muted-foreground">Browse</span>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">{icon}</div>
+        <div>
+          <p className="text-base font-semibold text-black">{label}</p>
+          <p className="text-sm text-gray-500 mt-1">{sublabel}</p>
+        </div>
+        <span className="text-sm px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-500 font-medium">Browse</span>
       </div>
     </div>
   );
@@ -772,7 +749,7 @@ function DropZone({ accept, icon, label, sublabel, inputRef, onFile }: { accept:
 
 function SuccessBadge({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+    <div className="flex items-center gap-2.5 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 font-medium">
       <CheckCircle2 className="w-4 h-4 flex-shrink-0" /><span>{text}</span>
     </div>
   );
@@ -780,7 +757,7 @@ function SuccessBadge({ text }: { text: string }) {
 
 function InfoBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+    <div className="flex items-center gap-2.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 font-medium">
       {icon}<span>{text}</span>
     </div>
   );
@@ -788,13 +765,13 @@ function InfoBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
 
 function WarnBox({ message }: { message: string }) {
   return (
-    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{message}</div>
+    <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 font-medium">{message}</div>
   );
 }
 
 function ErrorBox({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+    <div className="flex items-start gap-2.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 font-medium">
       <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />{message}
     </div>
   );
