@@ -1,0 +1,97 @@
+root@srv1232657:/var/www# cd STATATHONCONVERTERv1/
+root@srv1232657:/var/www/STATATHONCONVERTERv1# pnpm install
+Scope: all 9 workspace projects
+Lockfile is up to date, resolution step is skipped
+Packages: +489
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 489, reused 419, downloaded 70, added 489, done
+
+devDependencies:
++ prettier 3.8.3
++ typescript 5.9.3
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+└─ Done in 14ms
+Done in 18.9s using pnpm v10.33.0
+root@srv1232657:/var/www/STATATHONCONVERTERv1# pnpm run build
+
+> workspace@0.0.0 build /var/www/STATATHONCONVERTERv1
+> pnpm run typecheck && pnpm -r --if-present run build
+
+
+> workspace@0.0.0 typecheck /var/www/STATATHONCONVERTERv1
+> pnpm run typecheck:libs && pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+
+
+> workspace@0.0.0 typecheck:libs /var/www/STATATHONCONVERTERv1
+> tsc --build
+
+Scope: 4 of 9 workspace projects
+artifacts/api-server typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 2.9s
+artifacts/csv-profiler typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 15.1s
+artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 13s
+scripts typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 1.6s
+Scope: 8 of 9 workspace projects
+artifacts/mockup-sandbox build$ vite build
+│ failed to load config from /var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox/vite.config.ts
+│ error during build:
+│ Error: PORT environment variable is required but was not provided.
+│     at file:///var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox/node_modules/.vite-temp/vite.config.ts.timestamp-1781690490025-f092a58d6ed8a.mjs:145:9
+│     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+│     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+│     at async loadConfigFromBundledFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_…
+│     at async bundleAndLoadConfigFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_mo…
+│     at async loadConfigFromFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules…
+│     at async resolveConfig (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite…
+│     at async createBuilder (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite…
+│     at async CAC.<anonymous> (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vi…
+└─ Failed in 606ms at /var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox
+/var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/mockup-sandbox@2.0.0 build: `vite build`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.
+root@srv1232657:/var/www/STATATHONCONVERTERv1# npm run build
+
+> workspace@0.0.0 build
+> pnpm run typecheck && pnpm -r --if-present run build
+
+
+> workspace@0.0.0 typecheck /var/www/STATATHONCONVERTERv1
+> pnpm run typecheck:libs && pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+
+
+> workspace@0.0.0 typecheck:libs /var/www/STATATHONCONVERTERv1
+> tsc --build
+
+Scope: 4 of 9 workspace projects
+artifacts/csv-profiler typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 4.2s
+artifacts/api-server typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 1.8s
+artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 4.3s
+scripts typecheck$ tsc -p tsconfig.json --noEmit
+└─ Done in 1.7s
+Scope: 8 of 9 workspace projects
+artifacts/mockup-sandbox build$ vite build
+│ failed to load config from /var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox/vite.config.ts
+│ error during build:
+│ Error: PORT environment variable is required but was not provided.
+│     at file:///var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox/node_modules/.vite-temp/vite.config.ts.timestamp-1781690518080-9153c048c7b73.mjs:145:9
+│     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+│     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+│     at async loadConfigFromBundledFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_…
+│     at async bundleAndLoadConfigFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_mo…
+│     at async loadConfigFromFile (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules…
+│     at async resolveConfig (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite…
+│     at async createBuilder (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite…
+│     at async CAC.<anonymous> (file:///var/www/STATATHONCONVERTERv1/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vi…
+└─ Failed in 387ms at /var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox
+/var/www/STATATHONCONVERTERv1/artifacts/mockup-sandbox:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/mockup-sandbox@2.0.0 build: `vite build`
+Exit status 1
+root@srv1232657:/var/www/STATATHONCONVERTERv1#
