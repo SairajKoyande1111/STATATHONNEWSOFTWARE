@@ -668,15 +668,6 @@ function SideBySideModal({ loading, data, totalRows, onClose }: {
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const leftRef = useRef<HTMLDivElement>(null);
-  const rightRef = useRef<HTMLDivElement>(null);
-
-  // Sync horizontal scroll between both panes
-  const syncScroll = (src: "left" | "right") => (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const other = src === "left" ? rightRef.current : leftRef.current;
-    if (other) other.scrollLeft = target.scrollLeft;
-  };
 
   // Close on Escape key
   useEffect(() => {
@@ -742,7 +733,7 @@ function SideBySideModal({ loading, data, totalRows, onClose }: {
               <span className="text-sm font-semibold text-black">Original</span>
               <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{data.original.length.toLocaleString()} rows</span>
             </div>
-            <div ref={leftRef} className="flex-1 overflow-auto" onScroll={syncScroll("left")}>
+            <div className="flex-1 overflow-auto">
               <table className="text-xs border-collapse w-max min-w-full">
                 <thead className="sticky top-0 bg-gray-50 z-10">
                   <tr>
@@ -779,7 +770,7 @@ function SideBySideModal({ loading, data, totalRows, onClose }: {
               <span className="text-sm font-semibold text-emerald-800">Anonymized</span>
               <span className="text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">{data.anonymized.length.toLocaleString()} rows</span>
             </div>
-            <div ref={rightRef} className="flex-1 overflow-auto" onScroll={syncScroll("right")}>
+            <div className="flex-1 overflow-auto">
               <table className="text-xs border-collapse w-max min-w-full">
                 <thead className="sticky top-0 bg-emerald-50/80 z-10 backdrop-blur-sm">
                   <tr>
