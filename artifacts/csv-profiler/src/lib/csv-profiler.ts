@@ -139,13 +139,12 @@ export function profileData(
     const nullCount = totalCount - nonNullValues.length;
     const fillRate = totalCount > 0 ? (nonNullValues.length / totalCount) * 100 : 0;
 
-    // Field width = max string representation length across all values
-    let fieldWidth = name.length; // at least as wide as the header
+    // Field width = max string length of actual data values (NOT the column name)
+    // This mirrors how fixed-width layout files define field width from the data, not the label.
+    let fieldWidth = 1; // minimum 1 byte
     for (const v of rawValues) {
       if (v.length > fieldWidth) fieldWidth = v.length;
     }
-    // Minimum 1
-    if (fieldWidth < 1) fieldWidth = 1;
 
     const type = detectType(nonNullValues.slice(0, 200));
     const topValues = computeTopValues(nonNullValues);
