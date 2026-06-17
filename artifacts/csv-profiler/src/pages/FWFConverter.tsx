@@ -1,16 +1,34 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, FileSpreadsheet, CheckCircle2, AlertTriangle, X, ArrowRight, Download, Eye } from "lucide-react";
-import { parseLayoutFile, convertFWFToCSV, type FieldDef, type ParseLayoutResult } from "@/lib/fwf-parser";
+import {
+  Upload, FileText, FileSpreadsheet, CheckCircle2, AlertTriangle,
+  X, ArrowRight, Download, Eye, Layers, ChevronRight, RotateCcw,
+} from "lucide-react";
+import {
+  parseLayoutFile, readExcelFileInfo, getSheetRowCount,
+  convertFWFToCSV,
+  type FieldDef, type ParseLayoutResult, type ExcelFileInfo,
+} from "@/lib/fwf-parser";
 
 type Step = "layout" | "data" | "done";
+type LayoutSubStep = "upload" | "sheet-select" | "done";
 
 export default function FWFConverter() {
   const [step, setStep] = useState<Step>("layout");
 
   // Layout state
+  const [layoutSubStep, setLayoutSubStep] = useState<LayoutSubStep>("upload");
   const [layoutResult, setLayoutResult] = useState<ParseLayoutResult | null>(null);
   const [layoutFileName, setLayoutFileName] = useState<string>("");
   const [layoutError, setLayoutError] = useState<string>("");
+
+  // Sheet selection state (for multi-sheet Excel)
+  const [excelInfo, setExcelInfo] = useState<ExcelFileInfo | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [rowFrom, setRowFrom] = useState<string>("");
+  const [rowTo, setRowTo] = useState<string>("");
+  const [sheetRowCount, setSheetRowCount] = useState<number>(0);
+  const [applyingSheet, setApplyingSheet] = useState(false);
 
   // Data file state
   const [dataFileName, setDataFileName] = useState<string>("");
@@ -36,21 +54,123 @@ export default function FWFConverter() {
     setLayoutError("");
     setLayoutResult(null);
     setLayoutFileName(file.name);
+    const name = file.name.toLowerCase();
+
+    // For CSV/TSV: direct parse
+    if (name.endsWith(".csv") || name.endsWith(".tsv")) {
+      try {
+        const result = await parseLayoutFile(file);
+        if (result.fields.length === 0) {
+          setLayoutError(
+            result.warnings.join(" ") ||
+            "No fields found. Make sure your layout file has columns: Field_Name, Byte Position (Start), Byte Position (End)."
+          );
+          return;
+        }
+        setLayoutResult(result);
+        setLayoutSubStep("done");
+        setStep("data");
+      } catch (e) {
+        setLayoutError(`Failed to parse layout file: ${(e as Error).message}`);
+      }
+      return;
+    }
+
+    // For Excel: check number of sheets
     try {
-      const result = await parseLayoutFile(file);
+      const info = await readExcelFileInfo(file);
+      if (info.sheetNames.length > 1) {
+        // Multiple sheets → show sheet selection UI
+        setExcelInfo(info);
+        setPendingFile(file);
+        setSelectedSheet(info.sheetNames[0]);
+        const count = getSheetRowCount(info.buf, info.sheetNames[0]);
+        setSheetRowCount(count);
+        setRowFrom("");
+        setRowTo("");
+        setLayoutSubStep("sheet-select");
+      } else {
+        // Single sheet → parse directly
+        const result = await parseLayoutFile(file);
+        if (result.fields.length === 0) {
+          setLayoutError(
+            result.warnings.join(" ") ||
+            "No fields found. Make sure your layout file has columns: Field_Name, Byte Position (Start), Byte Position (End)."
+          );
+          return;
+        }
+        setLayoutResult(result);
+        setLayoutSubStep("done");
+        setStep("data");
+      }
+    } catch (e) {
+      setLayoutError(`Failed to read layout file: ${(e as Error).message}`);
+    }
+  }, []);
+
+  const handleSheetChange = useCallback((sheet: string) => {
+    setSelectedSheet(sheet);
+    if (excelInfo) {
+      const count = getSheetRowCount(excelInfo.buf, sheet);
+      setSheetRowCount(count);
+    }
+    setRowFrom("");
+    setRowTo("");
+  }, [excelInfo]);
+
+  const handleConfirmSheetSelection = useCallback(async () => {
+    if (!pendingFile || !selectedSheet) return;
+    setApplyingSheet(true);
+    setLayoutError("");
+    try {
+      const startRow = rowFrom ? parseInt(rowFrom, 10) : undefined;
+      const endRow = rowTo ? parseInt(rowTo, 10) : undefined;
+      const result = await parseLayoutFile(pendingFile, {
+        sheetName: selectedSheet,
+        startRow,
+        endRow,
+      });
+      if (result.fields.length === 0) {
+        setLayoutError(
+          result.warnings.filter(w => !w.startsWith("Scanning")).join(" ") ||
+          "No fields found in the selected sheet/row range."
+        );
+        setApplyingSheet(false);
+        return;
+      }
+      setLayoutResult(result);
+      setLayoutSubStep("done");
+      setStep("data");
+    } catch (e) {
+      setLayoutError(`Failed to parse layout: ${(e as Error).message}`);
+    } finally {
+      setApplyingSheet(false);
+    }
+  }, [pendingFile, selectedSheet, rowFrom, rowTo]);
+
+  const handleAutoDetect = useCallback(async () => {
+    if (!pendingFile) return;
+    setApplyingSheet(true);
+    setLayoutError("");
+    try {
+      const result = await parseLayoutFile(pendingFile);
       if (result.fields.length === 0) {
         setLayoutError(
           result.warnings.join(" ") ||
           "No fields found. Make sure your layout file has columns: Field_Name, Byte Position (Start), Byte Position (End)."
         );
+        setApplyingSheet(false);
         return;
       }
       setLayoutResult(result);
+      setLayoutSubStep("done");
       setStep("data");
     } catch (e) {
       setLayoutError(`Failed to parse layout file: ${(e as Error).message}`);
+    } finally {
+      setApplyingSheet(false);
     }
-  }, []);
+  }, [pendingFile]);
 
   // ── Data file upload ──────────────────────────────────────────────────────
 
@@ -116,9 +236,16 @@ export default function FWFConverter() {
 
   const handleReset = () => {
     setStep("layout");
+    setLayoutSubStep("upload");
     setLayoutResult(null);
     setLayoutFileName("");
     setLayoutError("");
+    setExcelInfo(null);
+    setPendingFile(null);
+    setSelectedSheet("");
+    setRowFrom("");
+    setRowTo("");
+    setSheetRowCount(0);
     setDataFileName("");
     setDataText("");
     setDataLineCount(0);
@@ -151,14 +278,15 @@ export default function FWFConverter() {
                 Excel (.xlsx) or CSV with columns: Field_Name, Byte Position (Start), Byte Position (End)
               </p>
             </div>
-            {layoutResult && (
-              <button onClick={handleReset} className="text-xs text-muted-foreground hover:text-foreground">
+            {(layoutResult || layoutSubStep === "sheet-select") && (
+              <button onClick={handleReset} className="text-xs text-muted-foreground hover:text-foreground" title="Start over">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
 
-          {!layoutResult ? (
+          {/* ── Sub-step: Upload ── */}
+          {layoutSubStep === "upload" && (
             <>
               <DropZone
                 accept=".xlsx,.xls,.csv"
@@ -170,7 +298,138 @@ export default function FWFConverter() {
               />
               {layoutError && <ErrorBox message={layoutError} />}
             </>
-          ) : (
+          )}
+
+          {/* ── Sub-step: Sheet + row selection ── */}
+          {layoutSubStep === "sheet-select" && excelInfo && (
+            <div className="space-y-4">
+              {/* File name badge */}
+              <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <FileSpreadsheet className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium truncate">{layoutFileName}</span>
+                <span className="ml-auto text-blue-500 whitespace-nowrap flex-shrink-0">
+                  {excelInfo.sheetNames.length} sheets found
+                </span>
+              </div>
+
+              {/* Sheet picker */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  Select sheet
+                </label>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {excelInfo.sheetNames.map((name) => (
+                    <label
+                      key={name}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-xs ${
+                        selectedSheet === name
+                          ? "border-primary bg-primary/5 text-foreground"
+                          : "border-border hover:border-primary/40 hover:bg-accent/20 text-muted-foreground"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sheet"
+                        value={name}
+                        checked={selectedSheet === name}
+                        onChange={() => handleSheetChange(name)}
+                        className="accent-primary"
+                      />
+                      <span className="font-medium">{name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row range */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">
+                    Row range
+                    {sheetRowCount > 0 && (
+                      <span className="ml-1 font-normal text-muted-foreground">
+                        (sheet has {sheetRowCount} rows)
+                      </span>
+                    )}
+                  </label>
+                  {(rowFrom || rowTo) && (
+                    <button
+                      onClick={() => { setRowFrom(""); setRowTo(""); }}
+                      className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" /> All rows
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[11px] text-muted-foreground">From row</p>
+                    <input
+                      type="number"
+                      min={1}
+                      max={sheetRowCount || undefined}
+                      placeholder="1"
+                      value={rowFrom}
+                      onChange={(e) => setRowFrom(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground mt-4 flex-shrink-0" />
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[11px] text-muted-foreground">To row</p>
+                    <input
+                      type="number"
+                      min={1}
+                      max={sheetRowCount || undefined}
+                      placeholder={sheetRowCount ? String(sheetRowCount) : "last"}
+                      value={rowTo}
+                      onChange={(e) => setRowTo(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Leave blank to scan all rows in the selected sheet.
+                </p>
+              </div>
+
+              {layoutError && <ErrorBox message={layoutError} />}
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={handleConfirmSheetSelection}
+                  disabled={applyingSheet || !selectedSheet}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                >
+                  {applyingSheet ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Parsing…
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      Use selected sheet
+                      {rowFrom || rowTo ? ` (rows ${rowFrom || "1"}–${rowTo || "end"})` : ""}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleAutoDetect}
+                  disabled={applyingSheet}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-60 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Auto-detect layout sheet (skip selection)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sub-step: Done (layout parsed) ── */}
+          {layoutSubStep === "done" && layoutResult && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />

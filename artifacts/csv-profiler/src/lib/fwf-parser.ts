@@ -17,6 +17,11 @@ export interface ParseLayoutResult {
   warnings: string[];
 }
 
+export interface ExcelFileInfo {
+  sheetNames: string[];
+  buf: ArrayBuffer;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function nh(s: unknown): string {
@@ -116,36 +121,68 @@ function rowToFieldDef(
   };
 }
 
-// ── Parse layout from Excel ArrayBuffer ──────────────────────────────────────
+// ── Get Excel sheet names ─────────────────────────────────────────────────────
+
+export function getExcelSheetNames(buf: ArrayBuffer): string[] {
+  const wb = XLSX.read(buf, { type: "array" });
+  return wb.SheetNames;
+}
+
+// ── Get row count for a specific sheet ───────────────────────────────────────
+
+export function getSheetRowCount(buf: ArrayBuffer, sheetName: string): number {
+  const wb = XLSX.read(buf, { type: "array" });
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return 0;
+  const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  return aoa.length;
+}
+
+// ── Parse layout from Excel ArrayBuffer (auto-detect sheet) ──────────────────
 
 export function parseLayoutFromExcel(
-  buf: ArrayBuffer
+  buf: ArrayBuffer,
+  options?: { sheetName?: string; startRow?: number; endRow?: number }
 ): ParseLayoutResult {
   const wb = XLSX.read(buf, { type: "array" });
   const warnings: string[] = [];
 
-  // Try to find a sheet that looks like a layout (has start/end columns)
-  let targetSheet = wb.SheetNames[0];
-  for (const name of wb.SheetNames) {
-    const ws = wb.Sheets[name];
-    const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, {
-      header: 1,
-      defval: "",
-    });
-    const firstNonEmpty = aoa.find((row) => row.some((c) => String(c).trim()));
-    if (!firstNonEmpty) continue;
-    const colMap = detectColumns(firstNonEmpty.map(String));
-    if (colMap.start && colMap.end) {
-      targetSheet = name;
-      break;
+  let targetSheet: string;
+
+  if (options?.sheetName && wb.SheetNames.includes(options.sheetName)) {
+    targetSheet = options.sheetName;
+  } else {
+    // Auto-detect: find a sheet that has start/end columns
+    targetSheet = wb.SheetNames[0];
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        defval: "",
+      });
+      const firstNonEmpty = aoa.find((row) => row.some((c) => String(c).trim()));
+      if (!firstNonEmpty) continue;
+      const colMap = detectColumns(firstNonEmpty.map(String));
+      if (colMap.start && colMap.end) {
+        targetSheet = name;
+        break;
+      }
     }
   }
 
   const ws = wb.Sheets[targetSheet];
-  const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+  let aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, {
     header: 1,
     defval: "",
   });
+
+  // Apply row range if specified (1-indexed, inclusive)
+  if (options?.startRow !== undefined || options?.endRow !== undefined) {
+    const s = Math.max(0, (options.startRow ?? 1) - 1);
+    const e = options.endRow !== undefined ? options.endRow : aoa.length;
+    aoa = aoa.slice(s, e);
+    warnings.push(`Scanning rows ${options.startRow ?? 1}–${Math.min(e, aoa.length + s)} of sheet "${targetSheet}".`);
+  }
 
   return parseFromAOA(aoa, targetSheet, warnings);
 }
@@ -271,7 +308,8 @@ function csvCell(value: string): string {
 // ── Parse layout file (auto-detect format) ───────────────────────────────────
 
 export async function parseLayoutFile(
-  file: File
+  file: File,
+  options?: { sheetName?: string; startRow?: number; endRow?: number }
 ): Promise<ParseLayoutResult> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || name.endsWith(".tsv")) {
@@ -280,5 +318,13 @@ export async function parseLayoutFile(
   }
   // Excel
   const buf = await file.arrayBuffer();
-  return parseLayoutFromExcel(buf);
+  return parseLayoutFromExcel(buf, options);
+}
+
+// ── Read Excel file info (sheet names) for UI ─────────────────────────────────
+
+export async function readExcelFileInfo(file: File): Promise<ExcelFileInfo> {
+  const buf = await file.arrayBuffer();
+  const sheetNames = getExcelSheetNames(buf);
+  return { sheetNames, buf };
 }
