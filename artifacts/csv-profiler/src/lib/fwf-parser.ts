@@ -300,6 +300,34 @@ function parseFromAOA(
   return { fields, sheetName, warnings };
 }
 
+// ── Convert FWF text → row objects ───────────────────────────────────────────
+
+export function fwfToRows(text: string, fields: FieldDef[]): Record<string, string>[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
+  return lines.map((line) => {
+    const row: Record<string, string> = {};
+    for (const f of fields) {
+      row[f.varName] = line.padEnd(f.end).substring(f.start - 1, f.end).trim();
+    }
+    return row;
+  });
+}
+
+// ── Convert row objects → CSV Blob ────────────────────────────────────────────
+
+export function rowsToCSVBlob(
+  rows: Record<string, string>[],
+  columns: string[]
+): Blob {
+  const header = columns.map(csvCell).join(",");
+  const dataLines = rows.map((row) =>
+    columns.map((c) => csvCell(row[c] ?? "")).join(",")
+  );
+  return new Blob([[header, ...dataLines].join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+}
+
 // ── Convert FWF text → CSV Blob ───────────────────────────────────────────────
 
 export interface ConvertOptions {
